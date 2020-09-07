@@ -1,0 +1,14 @@
+igbp,mean.int,mean.slp,cv,gpp.unit,csif.unit
+CRO_C4,-1.81,35.78,0.80,umol m-2 s-1,mW m−2 nm−1 sr−1
+CRO_C3,-0.32,19.73,0.99,umol m-2 s-1,mW m−2 nm−1 sr−1
+CSHR,-0.29,36.40,0.30,umol m-2 s-1,mW m−2 nm−1 sr−1
+DBF,-0.34,22.02,0.53,umol m-2 s-1,mW m−2 nm−1 sr−1
+DNF,0.2,12.98,0.59,umol m-2 s-1,mW m−2 nm−1 sr−1
+EBF,0,23.16,0.41,umol m-2 s-1,mW m−2 nm−1 sr−1
+ENF,0,26.84,0.55,umol m-2 s-1,mW m−2 nm−1 sr−1
+GRA,0,21.06,0.64,umol m-2 s-1,mW m−2 nm−1 sr−1
+MF,0,23.50,0.39,umol m-2 s-1,mW m−2 nm−1 sr−1
+OSHR,0,18.18,1.08,umol m-2 s-1,mW m−2 nm−1 sr−1
+SAV,0,26.02,0.63,umol m-2 s-1,mW m−2 nm−1 sr−1
+WET,0,22.77,0.86,umol m-2 s-1,mW m−2 nm−1 sr−1
+WSAV,0,24.75,0.42,umol m-2 s-1,mW m−2 nm−1 sr−1
