@@ -1,6 +1,7 @@
 #' predNEE: script to downscale daily GPP and RECO to hrly NEE
 #' this subroutine stores hourly NEE in a single day as tif files
 #' @author: Dien Wu, 07/17/2019 
+#' updated by @author Sabrina Madsen-Colford, 09/28/2021
 
 #' @param reg.name reg.name name, e.g., 'SaltLakeCity', without any space
 #' @param reg.path path that stores GPP and NEE
@@ -29,6 +30,7 @@ predNEE <- function(reg.name = 'westernCONUS',
                     SSRD.path, 
                     SSRD.field = c('ERA5', 'EPIC')[1], 
                     SSRD.varname = c('SSRD', NA)[1], 
+                    downscale_sd = TRUE,
                     smurf_wd = getwd()) {
 
   try({
@@ -57,11 +59,14 @@ predNEE <- function(reg.name = 'westernCONUS',
                             reco.file.num = num, overwriteTF = T)    
     
     reco.stk <- stack(reco.file, varname = 'Reco_mean')
-    all.dates <- as.POSIXct(as.numeric(gsub('X', '', names(reco.stk))), 
+    #all.dates <- as.POSIXct(as.numeric(gsub('X', '', names(reco.stk))), 
+    #                        origin = '1970-01-01 00:00:00', tz = 'UTC')
+    # SM, REPLACED THE LINE ABOVE WITH THE LINE BELOW (WAS NOT CONVERTING TO TIME CORRECTLY)
+    all.dates <- as.POSIXct(gsub('\\.','/',gsub('X', '', names(reco.stk))), 
                             origin = '1970-01-01 00:00:00', tz = 'UTC')
     all.timestr <- paste0(format(all.dates, format = '%Y%m%d'), '00')
 
-    nee.path <- file.path(reg.path, paste0('hourly_flux_', tolower(SSRD.field)))
+    nee.path <- file.path(reg.path, paste0('hourly_flux_GMIS_combined_ISA_a_w_sd_', tolower(SSRD.field)))
     dir.create(nee.path, showWarnings = F, recursive = T)
 
     # ------------------------------------------------------------------------ #
@@ -71,7 +76,8 @@ predNEE <- function(reg.name = 'westernCONUS',
     mon.timestr <- all.timestr[substr(all.timestr, 5, 6) == month]
 
     # store hourly fluxes into nc files by months
-    mean.gpp.stk <- mean.reco.stk <- mean.nee.stk <- NULL  
+    mean.gpp.stk <- mean.reco.stk <- mean.nee.stk <- NULL 
+    sd.gpp.stk <- sd.reco.stk <- sd.nee.stk <- NULL 
     for (tt in 1 : length(mon.timestr)) {
 
       cat('# ----------------------------------------------------- #')
@@ -80,18 +86,27 @@ predNEE <- function(reg.name = 'westernCONUS',
       # return list of hourly GPP, Reco and NEE CO2 fluxes
       hrly.list <- downscale.nee.hrly(mon.timestr[tt], gpp.file, reco.file, 
                                       TA.path, TA.field, TA.varname, SSRD.path, 
-                                      SSRD.field, SSRD.varname)
+                                      SSRD.field, SSRD.varname,downscale_sd)
 
       # store all hourly fluxes
       if (tt == 1) { 
           mean.gpp.stk  <- hrly.list$hrly_GPP_mean
           mean.reco.stk <- hrly.list$hrly_Reco_mean
           mean.nee.stk  <- hrly.list$hrly_NEE_mean
-
+          if (downscale_sd==TRUE){
+            sd.gpp.stk  <- hrly.list$hrly_GPP_sd
+            sd.reco.stk <- hrly.list$hrly_Reco_sd
+            sd.nee.stk  <- hrly.list$hrly_NEE_sd
+          }
       } else {
           mean.gpp.stk  <- stack(mean.gpp.stk, hrly.list$hrly_GPP_mean)
           mean.reco.stk <- stack(mean.reco.stk, hrly.list$hrly_Reco_mean)
           mean.nee.stk  <- stack(mean.nee.stk, hrly.list$hrly_NEE_mean)
+          if (downscale_sd==TRUE){
+            sd.gpp.stk  <- stack(sd.gpp.stk, hrly.list$hrly_GPP_sd)
+            sd.reco.stk <- stack(sd.reco.stk, hrly.list$hrly_Reco_sd)
+            sd.nee.stk  <- stack(sd.nee.stk, hrly.list$hrly_NEE_sd)
+          }
       }   # end if 
 
       gc()
@@ -102,20 +117,47 @@ predNEE <- function(reg.name = 'westernCONUS',
     cat(paste('\n\nStoring hourly fluxes as nc for', yyyymm, '\n'))
     nee.fn <- file.path(nee.path, paste0('hrly_mean_GPP_Reco_NEE_', reg.name, 
                                          '_', yyyymm, '.nc'))
+    nee_sd.fn <- file.path(nee.path, paste0('hrly_mean_GPP_Reco_NEE_sd_', reg.name, 
+                                         '_', yyyymm, '.nc'))
     
-    varnames  <- c('GPP_mean', 'Reco_mean', 'NEE_mean')
-    varunits  <- rep('umol m-2 s-1', 3)
-    longnames <- c('Hourly Mean Gross Primary Production (best estimates)', 
-                   'Hourly Mean Ecosystem Respiration (best estimates)', 
-                   'Hourly Mean Net Ecosystem Exchanges (best estimates)')
+    if (downscale_sd==TRUE){
+      varnames  <- c('GPP_mean', 'Reco_mean', 'NEE_mean','GPP_sd', 'Reco_sd', 'NEE_sd')
+      varunits  <- rep('umol m-2 s-1', 6)
+      longnames <- c('Hourly Mean Gross Primary Production (best estimates)', 
+                     'Hourly Mean Ecosystem Respiration (best estimates)', 
+                     'Hourly Mean Net Ecosystem Exchanges (best estimates)',
+                     'Hourly Downscaled Gross Primary Production Standard Deviation', 
+                     'Hourly Downscaled Ecosystem Respiration Standard Deviation', 
+                     'Hourly Downscaled Net Ecosystem Exchanges Standard Deviation')
 
-    # time format of names(mean.nee.stk), accuracy up to second in this case
-    zformat  <- 'X%Y.%m.%d.%H.%M.%S' 
-    stk.list <- list(mean.gpp.stk, mean.reco.stk, mean.nee.stk)
-    names(stk.list) <- varnames
+      # time format of names(mean.nee.stk), accuracy up to second in this case
+      zformat  <- 'X%Y.%m.%d.%H.%M.%S' 
+      stk.list <- list(mean.gpp.stk, mean.reco.stk, mean.nee.stk,sd.gpp.stk, sd.reco.stk, sd.nee.stk)
+      names(stk.list) <- varnames
+      
+      # call save.raster2nc for storing multiple rasterStacks into one nc file
+      save.raster2nc(varnames[1:3], varunits[1:3], longnames[1:3], zformat, stk.list[1:3], filename = nee.fn)
+      
+      # save nc file for standard deviation
+      save.raster2nc(varnames[4:6], varunits[4:6], longnames[4:6], zformat, stk.list[4:6], filename = nee_sd.fn)
+    }else{
+      varnames  <- c('GPP_mean', 'Reco_mean', 'NEE_mean')
+      varunits  <- rep('umol m-2 s-1', 3)
+      longnames <- c('Hourly Mean Gross Primary Production (best estimates)', 
+                     'Hourly Mean Ecosystem Respiration (best estimates)', 
+                     'Hourly Mean Net Ecosystem Exchanges (best estimates)')
+      
+      # time format of names(mean.nee.stk), accuracy up to second in this case
+      zformat  <- 'X%Y.%m.%d.%H.%M.%S' 
+      stk.list <- list(mean.gpp.stk, mean.reco.stk, mean.nee.stk)
+      names(stk.list) <- varnames
+      
+      ## call save.raster2nc for storing multiple rasterStacks into one nc file
+      save.raster2nc(varnames, varunits, longnames, zformat, stk.list, filename = nee.fn)
+    }
 
-    # call save.raster2nc for storing multiple rasterStacks into one nc file
-    save.raster2nc(varnames, varunits, longnames, zformat, stk.list, filename = nee.fn)
+     
+    removeTmpFiles(h=0.25) #remove temporary files older than 15 minutes
     
     return(nee.fn)  # return filename 
   })  # end of try()

@@ -1,5 +1,6 @@
 #' subroutine to estimate GPP
 #' @author Dien Wu, 07/03/2019, latest modification on 03/28/2020
+#' updated by @author: Sabrina Madsen-Colford, 11/29/2021
 
 # ---------------------------------------------------------------------------- #
 #' @param reg.name character string without any space for region name, e.g., 'westernCONUS'
@@ -53,6 +54,10 @@ predGPP <- function(reg.name = 'westernCONUS',  # character
                     sif.nd = 4,             # in days 
                     sif.res = 0.05,         # in deg
                     sif.rmTF = T,    # whether to force negative SIF as ZERO
+                    sif.temp = T,
+                    
+                    TA.path, 
+                    TA.varname,
 
                     gpp.path, 
                     smurf_wd,    # path for bio model repo
@@ -78,11 +83,23 @@ predGPP <- function(reg.name = 'westernCONUS',  # character
     # prepare MCD12 IGBP land cover
     lc.rt <- prep.mcd12(lc.path, lc.pattern, yr, lc.max.yr, reg.name, reg.ext)
 
+    # SM: replaced Savanna land cover with urban agb-based land cover, 
+    #     03/13/2024 
+    # UNCOMMENT to set savannas to urban
+    # (all Savanna Reco was negative in winter months)
+    
+    lc.rt[lc.rt==9] <- 13
+    lc.rt[lc.rt==8] <- 13
+    
+    #End Savanna fix
+    
+    # SM: removed CSIF urban bias correction, not needed when using TROPOMI SIF
+    #     11/29/2021
     # bias.corrTF logical flag, TRUE for performing urban bias correction
     #             according to Zhang et al. (2018), urban SIF may have an 
     #             underestimation of about 14.5%, thus we simply scale up 
     #             GPP-SIF slopes for MODIS-based urban areas
-    bias.corrTF <- FALSE; if (grepl('CSIF', sif.prod)) bias.corrTF <- TRUE
+    bias.corrTF <- FALSE #; if (grepl('CSIF', sif.prod)) bias.corrTF <- TRUE
 
     # Gap filling for urban SLOPEs by calling pred.slp.urban(), return a data.frame
     # see Wu et al. GMD, 2020 & calc.tree.type.frac.r for details, 03/28/2020
@@ -108,21 +125,21 @@ predGPP <- function(reg.name = 'westernCONUS',  # character
 
     ## loop over every 4 days in a particular yr
     gpp.mean.stk <- gpp.sd.stk <- sif.stk <- NULL    # initialize
-    for (tt in 1 : length(all.timestr)) {
-
+    looplength<-length(all.timestr) #include -6 in 2018 and -2 in 2019 (missing Dec files)
+    for (tt in 1 : looplength) { #winter=0 and 8-day resolution
         timestr <- all.timestr[tt]
         if (tt %% 5 == 0) cat(paste('\n# ---- Working on date:', timestr, ';', 
-                                    signif(tt / length(all.timestr)) * 100, 
+                                    signif(tt / looplength) * 100, 
                                     '% done --- #\n'))
 
         # ------------- 2.1 Grab spatial SIF and compute uncertainty --------- #
         ## grab two spatial SIF, they can be negative
         if (grepl('CSIF', sif.prod)) 
-            sif.rt <- grab.csif(sif.path, timestr, ext = reg.ext, var = sif.var) 
+            sif.rt <- grab.csif(sif.path, timestr, sif.temp, TA.path, TA.varname, ext = reg.ext, var = sif.var,yr=yr) 
         
         if (is.null(sif.rt)) stop(paste('predGPP(): No SIF file found for', 
                                   substr(timestr, 1, 8), 'Please check...\n'))
-        if (sif.rmTF) sif.rt[sif.rt < 0] <- 0     # force negative CSIF to zero
+        if (sif.rmTF) sif.rt[sif.rt < 0] <- 0     # force negative SIF to zero
 
         # ---------------------- 2.2 Compute gridded GPP -------------------- #
         # compute GPP with unit conversion to umol/m2/s, by calling compute.gpp()
@@ -141,7 +158,7 @@ predGPP <- function(reg.name = 'westernCONUS',  # character
         }   # end if tt == 1
 
         # generate a plot for one summertime day
-        if (tt == 50) {     
+        if (tt == 23) {     
             plot.stk <- gpp.stk
             g1 <- gridExtra::grid.arrange(levelplot(plot.stk, maxpixel = 1e6))
             title <- paste('4-day mean 0.05◦ GPP and uncertainty [umol m-2 s-1] for', 
@@ -169,7 +186,8 @@ predGPP <- function(reg.name = 'westernCONUS',  # character
     zformat <- 'X%Y.%m.%d'
 
     # assign correct layer names 
-    names(sif.stk) <- names(gpp.mean.stk) <- names(gpp.sd.stk) <- all.date
+    names(sif.stk) <- names(gpp.mean.stk) <- names(gpp.sd.stk) <- all.date[0:46]
+    #take only dates that were used in loop above
     
     # order of this list should match all variables above e.g., varnames
     stk.list <- list(sif.stk, gpp.mean.stk, gpp.sd.stk)

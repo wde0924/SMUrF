@@ -119,6 +119,7 @@ pred.slp <- function(gpp.path,
     urban.slp.brk <- rasterFromXYZ(urban.slp.df[, c('x', 'y', 'SLP', 'INT', 'GPP_CV')])
     crs(urban.slp.brk) <- '+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'
     urban.slp.brk <- raster::extend(urban.slp.brk, extent(prep.stk))
+    names(urban.slp.brk) <- c('SLP', 'INT', 'GPP_CV')          #******** ADDED LAYER NAMES *******
     
     # merge gap-filled rasters back to initial rasters
     merge.slp <- raster::merge(urban.slp.brk$SLP, prep.stk$SLP)
@@ -168,6 +169,9 @@ pred.slp <- function(gpp.path,
     # ------------------------------------------------------------------------ #
     # 5) aggregate slopes + uncertainty (calculate RMSE) to 0.05 deg, DW, 06/10/2019
     # ------------------------------------------------------------------------ #
+    
+    ##### THIS STEP NOT NECESSARY IF USING 500m x 500m TROPOMI SIF (does nothing)
+    
     cat('pred.slp(): 5) Aggregating slopes from 500 m to SIF"s resolution...\n')
     coarse.slp <- raster::aggregate(merge.slp, fact = sif.res / lc.res)
     coarse.int <- raster::aggregate(merge.int, fact = sif.res / lc.res)

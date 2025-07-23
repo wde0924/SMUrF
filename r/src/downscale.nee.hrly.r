@@ -1,14 +1,17 @@
 #' subroutine to temporally downscale NEE using Tair and SW
 #' and spatially downscale using VCF from MOD44B
 #' @author Dien Wu, 08/09/2019 
+#' updated by @author Sabrina Madsen-Colford, 03/27/2025
 
 #' 12/23/2019, DW, instead of using daily mean ssrd to normalize hourly ssrd, 
 #'                 use 4day mean ssrd to match the 4day mean GPP
+#' 03/27/2025, SM, added option to downscale uncertainty to hourly resolution
 
 downscale.nee.hrly <- function(timestr, gpp.file, reco.file, TA.path, TA.field, 
                                TA.varname, SSRD.path, 
                                SSRD.field = c('ERA5', 'EPIC')[1], 
-                               SSRD.varname = c('SSRD', NA)[1]) {
+                               SSRD.varname = c('SSRD', NA)[1],
+                               downscale_sd = TRUE) {
 
     # ----------------------------- Load GPP and RECO ----------------------- #
     cat(paste('\n\ndownscale.nee.hrly(): Loading daily mean GPP + RECO for', timestr, '\n'))
@@ -20,8 +23,11 @@ downscale.nee.hrly <- function(timestr, gpp.file, reco.file, TA.path, TA.field,
     mean.gpp.rt <- gpp.stk$GPP_mean; sd.gpp.rt <- gpp.stk$GPP_sd
     mean.reco.rt <- reco.stk$Reco_mean; sd.reco.rt <- reco.stk$Reco_sd
 
+    #The resolution is off by 3x10^-9 deg. this is causing problems.
+    # SM, Mannually set GPP sd to Reco sd resolution 03/27/2025
+    res(sd.gpp.rt) <- res(sd.reco.rt)
+    
     # site extent will be determined by the overlapped region between GPP and Reco
-    # extent(gpp) >= extent(reco.rt), so crop GPP based on RECO, to match RECO
     mean.gpp.int <- raster::intersect(mean.gpp.rt, mean.reco.rt)
     sd.gpp.int <- raster::intersect(sd.gpp.rt, sd.reco.rt)
     site.ext <- extent(mean.gpp.int)
@@ -58,10 +64,24 @@ downscale.nee.hrly <- function(timestr, gpp.file, reco.file, TA.path, TA.field,
     # compute hourly NEE from GPP and Reco 
     mean.nee.stk <- mean.reco.stk - mean.gpp.stk
     names(mean.nee.stk) <- names(mean.reco.stk)
-
-    # return all hourly GPP, Reco and NEE
-    hrly.list <- list(mean.gpp.stk, mean.reco.stk, mean.nee.stk)
-    names(hrly.list) <- c('hrly_GPP_mean', 'hrly_Reco_mean', 'hrly_NEE_mean')
+    
+    # SM, downscale uncertainty to hourly resolution. 03/27/2025
+    if (downscale_sd == TRUE){
+      sd.reco.stk <- sd.reco.rt * tscale; names(sd.reco.stk) <- names(tscale)
+      sd.gpp.stk  <- sd.gpp.int * iscale; names(sd.gpp.stk)  <- names(iscale)
+      
+      # compute hourly NEE sd from GPP and Reco using error propagation
+      sd.nee.stk <- (sd.reco.stk^2 + sd.gpp.stk^2)^(1/2)
+      names(sd.nee.stk) <- names(sd.reco.stk)
+      
+      # return all hourly GPP, Reco and NEE
+      hrly.list <- list(mean.gpp.stk, mean.reco.stk, mean.nee.stk, sd.gpp.stk, sd.reco.stk, sd.nee.stk)
+      names(hrly.list) <- c('hrly_GPP_mean', 'hrly_Reco_mean', 'hrly_NEE_mean', 'hrly_GPP_sd', 'hrly_Reco_sd', 'hrly_NEE_sd')
+    }else{
+      # return all hourly GPP, Reco and NEE
+      hrly.list <- list(mean.gpp.stk, mean.reco.stk, mean.nee.stk)
+      names(hrly.list) <- c('hrly_GPP_mean', 'hrly_Reco_mean', 'hrly_NEE_mean')
+    }
     
     return(hrly.list)
 }   # end of function

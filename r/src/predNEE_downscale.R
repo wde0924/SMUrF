@@ -30,7 +30,7 @@ predNEE.downscale <- function(site = 'SaltLakeCity',
     setwd(smurf_wd); source(file.path(smurf_wd, 'r/dependencies.r'), local = T)
     if (!is.na(tmpdir)) raster::rasterOptions(tmpdir = tmpdir)
 
-    flux.files <- list.files(reg.path, 'hrly_mean_GPP_Reco_NEE', full.names = T)
+    flux.files <- list.files(paste0(reg.path,'/hourly_flux_era5'),'hrly_mean_GPP_Reco_NEE', full.names = T)
     if (length(flux.files) == 0) stop('predNEE.downscale(): no NEE files found for this region')
 
     flux.file <- flux.files[grepl(substr(timestr, 1, 6), flux.files)]

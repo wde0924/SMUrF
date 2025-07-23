@@ -14,7 +14,7 @@ stack.reco <- function(reg.name = 'westernCONUS', reg.path, reco.dir,
     
     # this is the path that is defined when running main_script_Reco.r
     reco.path <- file.path(reg.path, reco.dir, substr(yyyymm, 1, 4))
-    fn <- file.path(reg.path, paste0('daily_mean_Reco_uncert_', reg.name, '_', yyyymm, '.nc'))
+    fn <- file.path(reg.path, paste0('daily_mean_Reco_uncert_GMIS_', reg.name, '_', yyyymm, '.nc'))
     
     if (!file.exists(fn) | overwriteTF == T) {
 
@@ -22,7 +22,11 @@ stack.reco <- function(reg.name = 'westernCONUS', reg.path, reco.dir,
              Start aggregating daily mean Reco in a year to one single nc file...\n')
 
         # look for all reco files
-        reco.files <- list.files(reco.path, pattern = 'daily_mean_Reco_uncert', full.names = T)
+
+        reco.files <- list.files(reco.path, pattern = paste0('daily_mean_Reco_uncert_GMIS_', reg.name), full.names = T)
+
+
+
         reco.files <- reco.files[grepl(yyyymm, basename(reco.files))]
         reco.files <- reco.files[basename(reco.files) != basename(fn)]
 

@@ -4,7 +4,8 @@
 #' 12/23/2019, DW, instead of using daily mean ssrd to normalize hourly ssrd, 
 #'                 use 4day mean ssrd to match the 4day mean GPP
 
-#' 05/26/2020, DW, need to match radiation data with the exact 4day mean GPP 
+#' 05/26/2020, DW, need to match radiation data with the exact 4day mean GPP
+#' 03/13/2024, SM, fixed issue with names not transferring to raster stack 
 
 compute.q10.ssrd <- function(TA.path, SSRD.path, timestr, site.ext = NULL, 
                              proj.rt = NULL, TA.varname = '2T', 
@@ -49,6 +50,9 @@ compute.q10.ssrd <- function(TA.path, SSRD.path, timestr, site.ext = NULL,
     SSRD.pj <- raster::projectRaster(SSRD.brk, proj.rt)
     SSRD.pj[SSRD.pj < 0] <- 0
     
+    # SM For some reason about 30% of the time in Feb 2020 the names are not 
+    # transferred from SSRD.brk to SSRD.pj so I do it manually below. 03/13/2024
+    names(SSRD.pj)<-names(SSRD.brk)
 
     # -------------------- Calculate hourly scaling factors ------------------ #
     cat(paste('\ncompute.q10.ssrd(): Calculating Q10, SSRD...\n'))
@@ -95,12 +99,7 @@ if (F) {
     ggsave(it, filename = '../paper3/gmd2020/tscale_iscale_20180701.png',
            width = 12, height = 8)
 
-}
-
-
-
-
-
+}  
 
 
 
