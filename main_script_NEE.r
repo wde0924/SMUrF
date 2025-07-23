@@ -1,5 +1,6 @@
 #' Main script to generate net ecosystem exchange
 #' @author: Dien Wu, 07/12/2019
+#' updated by @author Sabrina Madsen-Colford, 03/27/2025
 #' ---------------------------------------------------------------------------
 
 #' @GeneralIdeas:
@@ -10,19 +11,25 @@
 #' 10/28/2019 incorporate tree and non-tree vegetation fraction from MOD44B
 #' ---------------------------------------------------------------------------
 
+#' @Updates by Sabrina Madsen-Colfrod:
+#' 03/13/2024 Adjusted to use V6.1 of MODIS
+#' 03/27/2025 Added option to downscale uncertainty to hourly scale
+
 #args <- commandArgs(trailingOnly = TRUE)
+memory.limit(size=5e9)
 
 #### source all functions and load all libraries
-homedir <- '/uufs/chpc.utah.edu/common/home'
-smurf_wd <- file.path(homedir, 'lin-group7/wde/SMUrF'); setwd(smurf_wd) 
+homedir <- 'C:/Users/kitty/Documents/Research/SIF'
+smurf_wd <- file.path(homedir, 'SMUrF'); setwd(smurf_wd)
 source('r/dependencies.r')              # source all functions
 
 # ---------------------------------------------------------------------------
 # Paths one needs to modify 
 # ---------------------------------------------------------------------------
 # input and output paths
-input.path  <- file.path(homedir, 'lin-group7/wde/input_data')
-output.path <- file.path(homedir, 'lin-group7/wde/output')
+input.path  <- file.path(homedir, 'SMUrF/data')
+
+output.path <- file.path(homedir, 'SMUrF/output2018_500m_CSIF_to_TROPOMI_CSIF_ALL_converted_slps_V3_temp_impervious_R_shore_corr_V061_8day')
 
 
 # ---------------------------------------------------------------------------
@@ -30,35 +37,42 @@ output.path <- file.path(homedir, 'lin-group7/wde/output')
 # ---------------------------------------------------------------------------
 # name your region, needs to be consistent with that in main_script_GPPv2.r
 indx <- 2
-#indx <- as.numeric(args[1])
 reg.name <- c('westernCONUS', 'easternCONUS',     'westernEurope', 
               'easternChina', 'easternAustralia', 'easternAsia', 
               'southAmerica', 'centralAfrica')[indx]   
 reg.path <- file.path(output.path, reg.name)
 
 # the directory that stores daily mean Reco nc files
-reco.dir <- 'daily_mean_Reco_neuralnet/era5'
+reco.dir <- 'daily_mean_Reco_GMIS_ISA_a_neuralnet/era5'
 
 # please make sure this domain is <= than the domain of MODIS land cover,
 # 'minlon maxlon, minlat, laxlat' should matche the order of 'reg.name' above
 # *** too large a spatial extent may lead to memory issue, DONT DO ENTIRE GLOBE
-minlon <- c(-125, -95,  -11, 100,  130, 125, -65, -10)[indx]
-maxlon <- c( -95, -65,   20, 125,  155, 150, -40,  20)[indx]
-minlat <- c(  25,  25,   35,  20,  -40,  30, -40, -10)[indx]
-maxlat <- c(  50,  50,   60,  50,  -10,  55, -10,  15)[indx]
+# For Southern Ontario: -80.9, -78.3, 42.4, 44.7
+# For Montreal & Ottawa region: -76.2, -72.7, 44.5, 46.4
+# Just greater Montreal area: -74.4, -72.9, 45.1, 46.1
+
+#minlon <- c(-125, -80.9, -11, 100,  130, 125, -65, -10)[indx]
+#maxlon <- c( -95, -78.3,   20, 125,  155, 150, -40,  20)[indx]
+#minlat <- c(  25,  42.4,   35,  20,  -40,  30, -40, -10)[indx]
+#maxlat <- c(  50,  44.7,   60,  50,  -10,  55, -10,  15)[indx]
+minlon = -80.9; maxlon = -78.3; minlat = 42.4; maxlat = 44.7
+
 
 # each processor works on each month
+
 yr <- 2018
-mons <- seq(1, 12)
-#yr <- as.numeric(args[2])
-#mons <- as.numeric(args[3])
+mons <- seq(1,12)
 
 
 ## paths and variable names for loading hourly Tair and SW rad on surface data
 TA.field   <- 'ERA5'
 SSRD.field <- c('ERA5', 'EPIC')[1]
+
 TA.path    <- file.path(input.path, TA.field, yr) 
-SSRD.path  <- file.path(input.path, SSRD.field, yr) 
+SSRD.path  <- file.path(input.path, SSRD.field, yr,'Editted_SSRD') 
+
+
 
 # common portions in the filenames before YYYY* for grabbing all available files
 # here are examples of the suitable filenames: 
@@ -77,11 +91,17 @@ SSRD.varname <- c('SSRD', NA)[1]
 jobtime <- '1:00:00'      # total job time
 n_nodes <- 1   
 n_cores <- 1
-slurm   <- T      # False for not running parallelly
+slurm   <- F      # False for not running parallelly
 slurm_options <- list(time = jobtime, account = 'lin-kp', partition = 'lin-kp')
 jobname <- paste('SMUrF_NEE', reg.name, yr, sep = '_') 
 message(jobname)
 #stop()
+
+# ----------------------------------------------------------------------------
+# downscale Reco and GPP standard deviation, SM 03/27/2025
+# ----------------------------------------------------------------------------
+
+downscale_sd <- TRUE
 
 # ----------------------------------------------------------------------------
 # Start running and storing hourly fluxes in nc files (by months)
@@ -91,7 +111,10 @@ message('Number of parallel threads: ', n_nodes * n_cores)
 all.yyyymm <- paste0(yr, formatC(mons, width = 2, flag = 0))
 smurf_apply(FUN = predNEE, slurm, slurm_options, n_nodes, n_cores, jobname, 
             reg.name, reg.path, reco.dir, yyyymm = all.yyyymm, TA.path, TA.field, 
-            TA.varname, SSRD.path, SSRD.field, SSRD.varname, smurf_wd)
+            TA.varname, SSRD.path, SSRD.field, SSRD.varname, downscale_sd, smurf_wd)
+
+
+
 
 q('no')
 # end of script

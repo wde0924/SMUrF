@@ -1,3 +1,10 @@
+#' @author: Sabrina Madsen-Colford, 10/07/2022
+#' This code converts ACI crop types into a C3:C4 ratio in Canada,
+#' In the USA uses MapSPAM
+#' ACI data can be downloaded at:
+#'     https://www.agr.gc.ca/atlas/apps/aef/main/index_en.html?AGRIAPP=23 
+#' MapSPAM C3:C4 ratios available at: https://github.com/wde0924/SMUrF (Version 1)
+
 library("raster")
 library("ggplot2")
 library("shapefiles")
@@ -7,11 +14,19 @@ homedir <- 'C:/Users/kitty/Documents/Research/SIF'
 smurf_wd <- file.path(homedir, 'SMUrF'); setwd(smurf_wd)
 source('r/dependencies.r')
 
-imported_raster_aci=raster('E:/Research/Impermeable_Surface_data/ACI/aci_2018_qc_v3.tif')
-imported_raster_aci2=raster('E:/Research/Impermeable_Surface_data/ACI/aci_2018_on_v3.tif')
+# Include shorthand for provinces in the domain:
+provinces <- c('on') 
 
-plot(imported_raster_aci)
-plot(imported_raster_aci2)
+if(length(provinces)==2){
+  imported_raster_aci=raster(paste0('E:/Research/Impermeable_Surface_data/ACI/aci_2018_',provinces[1],'_v3.tif'))
+  imported_raster_aci2=raster(paste0('E:/Research/Impermeable_Surface_data/ACI/aci_2018_',provinces[2],'_v3.tif'))
+}else{
+  imported_raster_aci=raster(paste0('E:/Research/Impermeable_Surface_data/ACI/aci_2018_',provinces,'_v3.tif'))
+}
+
+# Optional plot
+#plot(imported_raster_aci)
+#plot(imported_raster_aci2)
 
 aci_crs = '+proj=aea +lat_0=40 +lon_0=-96 +lat_1=44.75 +lat_2=55.75 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
 
@@ -22,18 +37,19 @@ reg.name <- c('westernCONUS', 'easternCONUS',     'westernEurope',
 
 # Southern Ontario: -80.9, -78.3, 42.4, 44.7
 
-minlon <- c(-125, -76.5,  -11, 100,  130, 125, -65, -10)[indx]
-maxlon <- c( -95, -72.7,   20, 125,  155, 150, -40,  20)[indx]
-minlat <- c(  25,  44.5,   35,  20,  -40,  30, -40, -10)[indx]
-maxlat <- c(  50,  46.4,   60,  50,  -10,  55, -10,  15)[indx]
+#minlon <- c(-125, -76.5,  -11, 100,  130, 125, -65, -10)[indx]
+#maxlon <- c( -95, -72.7,   20, 125,  155, 150, -40,  20)[indx]
+#minlat <- c(  25,  44.5,   35,  20,  -40,  30, -40, -10)[indx]
+#maxlat <- c(  50,  46.4,   60,  50,  -10,  55, -10,  15)[indx]
+minlon = -80.9; maxlon = -78.3; minlat = 42.4; maxlat = 44.7
 reg.ext<-extent(minlon, maxlon, minlat, maxlat)
 
-lc.path    <- file.path(smurf_wd, 'data/MCD12Q1/Montreal_Ottawa')
+lc.path    <- file.path(smurf_wd, 'data/MCD12Q1')
 lc.pattern <- 'MCD12Q1.061_LC_Type1'
 
 # indicate the latest year available of MCD12Q1
-# if no data beyond 2022, use 2022 LC for 2023 and beyond
-lc.max.yr <- 2018  
+# e.g. if no data beyond 2022, use 2022 LC for 2023 and beyond
+lc.max.yr <- 2022  
 lc.res    <- 1/24
 
 lc.rt <- prep.mcd12(lc.path, lc.pattern, 2018, lc.max.yr, reg.name, reg.ext)
@@ -42,17 +58,20 @@ p <- as(reg.ext, 'SpatialPolygons')
 crs(p) <- "+proj=longlat +datum=WGS84 +no_defs"
 bound_box_aci<-spTransform(p,aci_crs)
 
-ACIcrop <-crop(imported_raster_aci,bound_box_aci)
-ACIcrop2 <-crop(imported_raster_aci2,bound_box_aci)
+if(length(provinces)==2){
+  ACIcrop <-crop(imported_raster_aci,bound_box_aci)
+  ACIcrop2 <-crop(imported_raster_aci2,bound_box_aci)
+  merged_raster <- mosaic(ACIcrop,ACIcrop2,fun=max)
+}else{
+  ACIcrop <-crop(imported_raster_aci,bound_box_aci)
+  merged_raster <- ACIcrop
+}
 
 
-merged_raster <- mosaic(ACIcrop,ACIcrop2,fun=max)
 
 #create a raster
 x <-raster()
 #set the number of columns, rows, and extent
-# 2km res x <- raster(ncol=210, nrow=170, xmn=1270260, xmx=1275360, ymn=611160, ymx=617460)
-#x <- raster(ncol=8696, nrow=9822, xmn=1188780, xmx=1449660, ymn=390210, ymx=684870) #For S. Ontario
 x <- raster(ncol=ncol(merged_raster), nrow=nrow(merged_raster), xmn=xmin(merged_raster), xmx=xmax(merged_raster), ymn=ymin(merged_raster), ymx=ymax(merged_raster)) #For Montreal/Ottawa
 res(x)
 ## check the number of cells is 85412112 for S. Ontario
@@ -69,7 +88,12 @@ x[x==20]<- 0
 
 
 ACI_LC=x
-rm(x, ACIcrop, ACIcrop2, merged_raster)
+if(length(provinces)==2){
+  rm(ACIcrop2)
+}
+rm(x, ACIcrop, merged_raster)
+
+# Assign 1 to C4 crops & 0 to C3 crops:
 #ACI_LC[x==20]=0 #Water -> 0
 #ACI_LC[x==30]=0 #Exposed/Baren -> 0
 
@@ -81,22 +105,17 @@ rm(x, ACIcrop, ACIcrop2, merged_raster)
 #ACI_LC[x==80]=0 #?Wetland -> 0?
                 # It seems most above ground (not underwater) wetland species
                 # including mosses are C3 
-# Borden are classified as swamps MAY NEED TO REVISE
-# Not sure if this works for TP since there are both swamps and marshes...
-# https://geohub.lio.gov.on.ca/datasets/mnrf::wetlands/explore?filters=eyJXRVRMQU5EX1RZUEUiOlsiU3dhbXAiLCJGZW4iLCJCb2ciLCJVbmtub3duIiwiTWFyc2giLCJPcGVuIFdhdGVyIl19&location=44.296891%2C-79.932475%2C13.35
 
 #ACI_LC[x==85]=0 #?Peatland (wetland comercially harvested for peat) -> 0?
                 # Typically form due to Sphagnum mosses (bogs and fens rare in S.ON)
                 # Can contain herbs, ferns, grasses, sedges, shrubs and trees
 #ACI_LC[ACI_LC<100]=0
 
-#ACI_LC[ACI_LC==110]=0.95 #?Grassland -> 1? (95% of S.Ont grasses seem to be C4 remainder 
-                 # is mostly Canada Rye (C3) and a few mixed species)
-#only used for crops in SMUrF
+#ACI_LC[ACI_LC==110]=0 # only used for crops in SMUrF
 
 #ACI_LC[ACI_LC==120]=0 #?Agriculture (undifferentiated) -> 0? (look into average % of C4 plants in crops?)
 
-#ACI_LC[ACI_LC==122]=0 # Passture/Forages -> 0? Look into what kind of grasses are typically used
+#ACI_LC[ACI_LC==122]=0 # Passture/Forages -> 0 
                  # Pastures are usually a mixture of grasses and legumes (clover)
                  # Most common grasses according to OMAFRA are timothy (C3), 
                  # brome (C3), orchard (C3), reed canary (C3), fescues (C3),
@@ -178,31 +197,16 @@ ACI_LC[ACI_LC==147]=1 #Corn is C4 -> 1
 
 ACI_LC[ACI_LC>2]=0
 
-#par(mar=c(3,3,3,0))
-#plot(ACI_LC, main='ACI C4 Plants')
-
 ACI_C4_proj<-projectRaster(ACI_LC, crs='+proj=longlat +datum=WGS84 +no_defs', method='ngb')
-#par(mar=c(3,3,3,0))
-#plot(ACI_C4_proj, main='ACI C4 fraction (proj=WGS84)')
-
 ACI_C4_crop<-crop(ACI_C4_proj, p, method='ngb')
-#par(mar=c(3,3,3,0))
-#plot(ACI_C4_crop, main='ACI C4 fraction cropped')
-
-
 ACI_resample<-resample(ACI_C4_crop,lc.rt)
-#plot(ACI_resample,main='ACI C4 fraction')
 
 
-#If there is no data
+#If there is no ACI data:
 ratio.fn <- file.path(smurf_wd, 'data/C4_relative_fraction.tif')
 SPAM_C4 <- raster(ratio.fn)
 SPAM_C4_crop <- crop(SPAM_C4,p,method='ngb')
 SPAM_C4_resample <- resample(SPAM_C4_crop,lc.rt,method='ngb')
-
-##smurf_C4<-raster("E:/Research/SMUrF/output2018_500m_CSIF_to_TROPOMI_CSIF_ALL_converted_slps_temp_impervious_R_8day/easternCONUS/C4_ratio_easternCONUS.tif")
-
-
 
 SPAM_US_crops <- SPAM_C4_resample
 SPAM_US_crops[(ACI_resample>=0)]<-NA #Isolate only the areas in the US (where ACI does not exist)
@@ -212,7 +216,7 @@ SPAM_US_crops[(lc.rt!=12) & (lc.rt!=13)]<-NA #isolate only areas defined by MODI
 # where the filling occurs)
 SPAM_US_mean_C4_ratio <- mean(values(SPAM_US_crops),na.rm=T)
 
-
+#Replace US areas with MapSPAM C4 ratio
 ACI_resample[ACI_resample< 0]=SPAM_C4_resample[ACI_resample< 0]
 ACI_resample[is.na(ACI_resample)]=SPAM_C4_resample[is.na(ACI_resample)]
 
@@ -224,5 +228,5 @@ ACI_resample_filled[is.na(ACI_resample) & ((lc.rt==12) | (lc.rt==14))] <- SPAM_U
 plot(ACI_resample_filled,main='ACI & SPAM C4 fraction')
 
 
-writeRaster(ACI_resample_filled,filename="C:/Users/kitty/Documents/Research/SIF/SMUrF/data/ACI_C4_fraction_Montreal_Ottawa_500m_2018.tif",
+writeRaster(ACI_resample_filled,filename="C:/Users/kitty/Documents/Research/SIF/SMUrF/data/ACI_C4_fraction_500m_2018.tif",
             overwrite=TRUE)
