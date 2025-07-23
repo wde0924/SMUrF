@@ -1,6 +1,7 @@
 #' subroutine to load or generate 500m GPP-SIF slopes and AGB data
 #' before any urban gap-fills 
 #' @author Dien Wu, 09/10/2019 
+#' Updated by @author Sabrina Madsen-Colford, 03/12/2021
 
 # separate C3 from C4, DW, 03/29/2020
 prep.slp.agb <- function(prep.path, yr, slp.file, agb.file, ratio.file, 
@@ -31,7 +32,7 @@ prep.slp.agb <- function(prep.path, yr, slp.file, agb.file, ratio.file,
         names(c3.rt) <- gsub('C4', 'C3', names(c4.rt))
 
         # read IGBP for a specific year
-        igbp.stk <- stack(crop(lc.rt, reg.ext), c4.rt, c3.rt)
+        igbp.stk <- stack(crop(lc.rt, reg.ext), crop(c4.rt, reg.ext), crop(c3.rt, reg.ext))
         igbp.df <- raster::as.data.frame(igbp.stk, xy = T)
         colnames(igbp.df) <- list('x', 'y', 'val', 'c4.frac', 'c3.frac')
 
@@ -64,6 +65,9 @@ prep.slp.agb <- function(prep.path, yr, slp.file, agb.file, ratio.file,
         cat('prep.slp.agb(): Converting data frame back to rasterStack...\n')
         slp.stk <- rasterFromXYZ(rev.df %>% dplyr::select('x', 'y', 'SLP', 'INT', 'cv'))
         crs(slp.stk) <- '+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'
+        
+        # SM, 03/12/2021: added layer names because they were not being called properly
+        names(slp.stk)<- c('SLP','INT','cv') 
 
         # read biomass data and reproject 100m biomass to 500m
         cat('prep.slp.agb(): reprojecting 100m AGB to 500m Land cover grids...\n')

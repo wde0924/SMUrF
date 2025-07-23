@@ -1,5 +1,6 @@
 #' script to transform daily mean Reco to the correct form for predicting flux
 #' @author: Dien Wu, 08/09/2019 
+#' updated by @author Sabrina Madsen-Colford, 10/07/2022
 
 #' input:
 #' @param timestr YYYYMMDDHH
@@ -45,12 +46,11 @@ crop.smurf.hrly.flux <- function(timestr, flux.file, site.ext = NULL,
     # string must contain 'e' for scientific notation
     fix.sci.not <- function(string) as.character(as.integer(gsub('e.', 'e+', string)))
 
-    # get reco rasterStack dimensions, second since 1970-01-01
-    flux.names <- gsub('X', '', names(flux.mean))
-    flux.names[grepl('e.', flux.names)] <- fix.sci.not(flux.names[grepl('e.', flux.names)])
-    flux.names <- as.numeric(flux.names)
-    flux.dates <- as.POSIXct(flux.names, origin = '1970-01-01 00:00:00', tz = 'UTC')
+    # SM: Fixed issue with time not being properly extracted, 10/07/2022
+    flux.names <- gsub('\\.','/',gsub('X', '', names(flux.mean)))
+    flux.dates <- as.POSIXct(flux.names, origin = '1970-01-01 00:00:00', tz = 'UTC',format='%Y/%m/%d/%H/%M/%S')
     flux.timestr <- as.numeric(paste0(format(flux.dates, '%Y%m%d%H')))
+    
     flux.nhr <- flux.timestr[2] - flux.timestr[1]       # temporal res in days
 
     ## select reco that falls within 'nhrs' from 'timestr'

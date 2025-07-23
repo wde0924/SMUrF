@@ -1,5 +1,6 @@
 # script to transform daily mean GPP to the correct form for predicting Reco 
 #' @author: Dien Wu, 05/28/2019 
+#' updated by @author: Sabrina Madsen-Colford, 09/28/2021
 
 #' input:
 #' @param timestr YYYYMMDDHH
@@ -25,7 +26,9 @@ crop.smurf.gpp <- function(timestr, gpp.file, nhrs, site.ext = NULL,
     }
 
     # get GPP rasterStack dimensions, second since 1970-01-01
-    gpp.names <- as.numeric(gsub('X', '', names(gpp.mean)))
+    #gpp.names <- as.numeric(gsub('X', '', names(gpp.mean)))    
+    # SM: I REPLACED THE LINE ABOVE WITH THE LINE BELOW (WAS NOT CONVERTING TO TIME CORRECTLY)
+    gpp.names <- gsub('\\.', '/',gsub('X', '', names(gpp.mean))) 
     gpp.dates <- as.POSIXct(gpp.names, origin = '1970-01-01 00:00:00', tz = 'UTC')
     gpp.timestr <- as.numeric(paste0(format(gpp.dates, '%Y%m%d')))
     gpp.nd <- gpp.timestr[2] - gpp.timestr[1]       # temporal res in days
