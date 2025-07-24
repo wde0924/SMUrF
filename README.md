@@ -16,7 +16,7 @@ Features:
 
 3. Estimate hourly mean NEE by downscaling GPP and Reco (following Fisher et al., 2016) using reanalysis and data assimilation products
 
-## Reference:
+## References:
 Wu, D., Lin, J. C., Duarte, H. F., Yadav, V., Parazoo, N. C., Oda, T., and Kort, E. A.: A model for urban biogenic CO2 fluxes: Solar-Induced Fluorescence for Modeling Urban biogenic Fluxes (SMUrF v1), Geosci. Model Dev., 14, 3633–3661, https://doi.org/10.5194/gmd-14-3633-2021, 2021. 
 
 Madsen-Colford, S., Hutyra, L., Smith, I., Wu, D., Arain, M. A., Staebler, R., Ma, W., Restrepo-Coupe, N., and Wunch, D.: Modification and comparison of two urban vegetation models over Southern Ontario, Canada, submitted to _JGR Biogeosciences_.
