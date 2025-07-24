@@ -30,12 +30,14 @@ mod_EVI <- function(mod_dir='C:/Users/kitty/Documents/Research/SIF/UrbanVPRM/Urb
   
   ##create a raster
   EVI_raster_V061 <-raster()
-  ##set the number of columns, rows, and extent
-  EVI_raster_V061 <- brick(ncol=ncol(lc.rt), nrow=nrow(lc.rt), xmn=minlon, xmx=maxlon, ymn=minlat, ymx=maxlat,nl=380)
+  ##set the number of columns, rows, layers, and extent
+  #*** nl = 378 for non-leap years, nl = 380 for leap years
+  EVI_raster_V061 <- brick(ncol=ncol(lc.rt), nrow=nrow(lc.rt), xmn=minlon, xmx=maxlon, ymn=minlat, ymx=maxlat,nl=378)
   res(EVI_raster_V061)
   ##check the number of cells is 344448 for the GTA, 383040 for Montreal/Ottawa
   ncell(EVI_raster_V061)
-  names(EVI_raster_V061)<-paste('DOY',-3:376,sep="") #name the layers
+  # *** DOY -3:374 for non-leap years, -3:376 for leap years
+  names(EVI_raster_V061)<-paste('DOY',-3:374,sep="") #name the layers
   
   
   
@@ -108,19 +110,21 @@ mod_EVI <- function(mod_dir='C:/Users/kitty/Documents/Research/SIF/UrbanVPRM/Urb
   rm(b01_file,b02_file,b03_file,file1,file2,file3,file14,qc_file)
   
   Inter_EVI_raster_V061 <-raster()
-  #set the number of columns, rows, and extent
-  Inter_EVI_raster_V061 <- brick(ncol=ncol(lc.rt), nrow=nrow(lc.rt), xmn=minlon, xmx=maxlon, ymn=minlat, ymx=maxlat,nl=380)
+  #set the number of columns, rows, layers, and extent
+  #*** nl = 378 for non-leap years, nl = 380 for leap years
+  Inter_EVI_raster_V061 <- brick(ncol=ncol(lc.rt), nrow=nrow(lc.rt), xmn=minlon, xmx=maxlon, ymn=minlat, ymx=maxlat,nl=378) 
   res(Inter_EVI_raster_V061)
   #check the number of cells is 344448 for the GTA
   ncell(Inter_EVI_raster_V061)
-  names(Inter_EVI_raster_V061)<-paste('DOY',-3:376,sep="") #name the layers
+  # *** DOY -3:374 for non-leap years, -3:376 for leap years
+  names(Inter_EVI_raster_V061)<-paste('DOY',-3:374,sep="") #name the layers
 
   
   EVI_values_V061<-values(EVI_raster_V061)
   EVI_length_V061<-length(values(EVI_raster_V061$DOY1))
   Inter_EVI_values_V061<-values(Inter_EVI_raster_V061)
   
-  DOY<-c(-3:376)
+  DOY<-c(-3:374)
   
   print("Interpolate MODIS Data")
   interpolate <- function(evi){
@@ -141,7 +145,7 @@ mod_EVI <- function(mod_dir='C:/Users/kitty/Documents/Research/SIF/UrbanVPRM/Urb
     names(pix)<-c('DOY','EVI')
     if(abs(sum(EVI,na.rm=TRUE))>0){
       spl<- with(pix[!is.na(pix$EVI),],smooth.spline(DOY,EVI, spar = .25)) #.25
-      Inter_EVI_values_V061[i,]<-predict(spl, c(-3:374))$y #Change to -3:374 for non-leap year, -3:376 for leap year
+      Inter_EVI_values_V061[i,]<-predict(spl, DOY)$y #Change to -3:374 for non-leap year, -3:376 for leap year
     }
   }})
   values(Inter_EVI_raster_V061)<-Inter_EVI_values_V061
